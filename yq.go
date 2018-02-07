@@ -10,8 +10,45 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func usage() {
-	println("Bad usage")
+func tooManyArguments() {
+	println("Too many arguments provided. Maximum number of arguments is 2.")
+}
+
+func tooFewArguments() {
+	println("Too few arguments provided. Requires at least 1 argument.")
+}
+
+func invalidQueryString() {
+	println("Invalid query string.")
+}
+
+func validateArgumentCount(count int) {
+	if count < 1 {
+		tooFewArguments()
+		os.Exit(-1)
+	}
+	if count > 2 {
+		tooManyArguments()
+		os.Exit(-1)
+	}
+}
+
+func validateQueryString(queryString string) {
+	if queryString[0] != '.' {
+		invalidQueryString()
+		os.Exit(-1)
+	}
+}
+
+func getIoType(args []string) (io.Reader, error) {
+	if len(args) == 2 {
+		f, err := os.Open(args[1])
+		if err != nil {
+			return nil, err
+		}
+		return f, nil
+	}
+	return os.Stdin, nil
 }
 
 func parse_yaml(text string, queryString string) interface{} {
@@ -26,27 +63,16 @@ func parse_yaml(text string, queryString string) interface{} {
 func main() {
 	flag.Parse()
 	var io_type io.Reader
-	if len(flag.Args()) < 1 || len(flag.Args()) > 2 {
-		usage()
-		os.Exit(-1)
-	}
+	validateArgumentCount(len(flag.Args()))
 	queryString := flag.Args()[0]
-	if queryString[0] != '.' {
-		usage()
+	validateQueryString(queryString)
+	buf := make([]byte, 0, 4*1024)
+	io_type, err := getIoType(flag.Args())
+	if err != nil {
+		fmt.Printf("Error reading file: %v", err)
 		os.Exit(-1)
 	}
 
-	buf := make([]byte, 0, 4*1024)
-	if len(flag.Args()) == 2 {
-		f, err := os.Open(flag.Args()[1])
-		if err != nil {
-			fmt.Printf("Error reading file: %v", err)
-			os.Exit(-1)
-		}
-		io_type = f
-	} else {
-		io_type = os.Stdin
-	}
 	reader := bufio.NewReader(io_type)
 	s, err := reader.Read(buf[:cap(buf)])
 	if err != nil {
@@ -55,5 +81,5 @@ func main() {
 	}
 	text := string(buf[:s])
 	parsed_map := parse_yaml(text, queryString)
-	fmt.Printf("%v", parsed_map)
+	fmt.Printf("%v\n", parsed_map)
 }
